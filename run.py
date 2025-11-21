@@ -151,7 +151,7 @@ if __name__ == "__main__":
     rccltests_path = os.path.join(cwd, "3rd_party/rccl-tests")
     os.makedirs(archive_dir, exist_ok=True)
 
-    global logger 
+    global logger  # global
     logger = Logger(log_dir)
     
     main(args)
