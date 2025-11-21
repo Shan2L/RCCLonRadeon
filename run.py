@@ -3,6 +3,7 @@ import subprocess
 import os
 from typing import Dict
 from datetime import datetime
+import shutil
 
 
 class Logger:
@@ -37,7 +38,7 @@ def print_args(args):
     print("==================================================== ")
     
 
-def run_bash_command(command: list[str], timeout: int=10, cwd=None) -> Dict: 
+def run_bash_command(command: list[str], timeout: int=600, cwd=None) -> Dict:
     logger.log(f"Running command: {' '.join(command)}")
     ret = subprocess.run(command, capture_output=True, text=True, shell=False, timeout=timeout, cwd=cwd if cwd else None)
     if ret.returncode != 0:
@@ -55,11 +56,13 @@ def init_submodules():
 
 def install_mpi():
     if not os.path.exists("/usr/local/mpi"):
-        run_bash_command(["wget", "https://www.mpich.org/static/downloads/4.3.1/mpich-4.3.1.tar.gz"])
-        run_bash_command(["tar", "-xzvf", "mpich-4.3.1.tar.gz"])
+        if not os.path.exists(os.path.join(cwd, "mpich-4.3.1.tar.gz")):
+            run_bash_command(["wget", "https://www.mpich.org/static/downloads/4.3.1/mpich-4.3.1.tar.gz"])
+        if not os.path.exists(os.path.join(cwd, "mpich-4.3.1")):
+            run_bash_command(["tar", "-xzvf", "mpich-4.3.1.tar.gz"])
         run_bash_command(["./configure", "--prefix=/usr/local/mpi"], cwd=os.path.join(cwd, "mpich-4.3.1"))
-        run_bash_command(["make", "-j", "128"])
-        run_bash_command(["make", "install"])
+        run_bash_command(["make", "-j", "128"], cwd=os.path.join(cwd, "mpich-4.3.1"))
+        run_bash_command(["make", "install"], cwd=os.path.join(cwd, "mpich-4.3.1"))
         logger.log("MPI has been installed to /usr/local/mpi successfully.")
 
 
@@ -87,14 +90,15 @@ def main(args):
     
     # build rccl
     if os.path.exists(args.prefix):
-        os.rmdir(args.path)
+        shutil.rmtree(args.prefix, )
+        logger.log(f"Removed existing installation directory: {args.prefix}")
     rccl_build_command = ["./install.sh", f"--prefix={args.prefix}", "--install", "-j 128"]
     if args.debug:
         rccl_build_command.append("--debug")
     if args.amdgpu_targets:
-        rccl_build_command.append(f"--amdgpu_targts='{args.amdgpu_targets}'")
+        rccl_build_command.append(f"--amdgpu_targets='{args.amdgpu_targets}'")
         
-    run_bash_command(rccl_build_command, cwd=rccl_path, timeout=1200)
+    run_bash_command(rccl_build_command, cwd=rccl_path, timeout=6000)
     logger.log("RCCL build successfully.")
 
     # cp .so to archive dir
@@ -104,7 +108,8 @@ def main(args):
     # build rccl-tests
     if args.build_rccl_tests:
         build_tests_command = [f"GPU_TARGETS={args.amdgpu_targets}", 
-                               f"LD_LIBRARY_PATH={args.prefix}/lib:$LIBRARY_PATH" "make"]
+                               f"LD_LIBRARY_PATH={args.prefix}/lib:$LIBRARY_PATH",
+                                "make"]
         if args.build_tests_with_MPI:
             build_tests_command.append("USE_MPI=1")
             build_tests_command.append("MPI_HOME=/usr/local/mpi")
@@ -112,14 +117,14 @@ def main(args):
             install_mpi()
 
         build_tests_command.extend(["-j", "32"])
-        run_bash_command(build_tests_command, cwd=rccltests_path, timeout=6000)
+        run_bash_command(build_tests_command, cwd=rccltests_path, timeout=600)
         logger.log("Rcccl-tests built successfully.")
 
 if __name__ == "__main__":
 
     now = datetime.now()
     cwd = os.getcwd()
-    time_str = now.strftime("%Y-%m-%d-%H_%M_%S")  # 2025-11-21 14:30:45
+    time_str = now.strftime("%Y-%m-%d-%H_%M_%S")  # 2025-11-21-4_30_45
 
     args = argparse.ArgumentParser(description="Build RCCL library for Radeon GPUs")
     args.add_argument("--patch_list", type=str, 
@@ -143,9 +148,10 @@ if __name__ == "__main__":
     patch_dir = os.path.join(cwd, "patches")
     archive_dir = os.path.join(args.archive_dir, time_str)
     rccl_path = os.path.join(cwd, "3rd_party/rccl")
-    rccltests_path = os.path.join(cwd, "3rd_party/rccl_tests")
+    rccltests_path = os.path.join(cwd, "3rd_party/rccl-tests")
     os.makedirs(archive_dir, exist_ok=True)
 
+    global logger 
     logger = Logger(log_dir)
     
     main(args)

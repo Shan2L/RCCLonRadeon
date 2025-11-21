@@ -1,0 +1,6 @@
+logs
+archives
+install
+mpich*
+
+__pycache__/
