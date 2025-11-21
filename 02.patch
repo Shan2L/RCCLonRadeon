@@ -1,0 +1,13 @@
+diff --git a/src/graph/paths.cc b/src/graph/paths.cc
+index 1bdca8b8..5b9ce573 100644
+--- a/src/graph/paths.cc
++++ b/src/graph/paths.cc
+@@ -298,7 +298,7 @@ ncclResult_t ncclTopoCheckP2p(struct ncclTopoSystem* system, int64_t id1, int64_
+   NCCLCHECK(ncclTopoCpuType(system, &arch, &vendor, &model));
+   if (arch == NCCL_TOPO_CPU_ARCH_ARM) p2pLevel = PATH_PXB;
+   if (arch == NCCL_TOPO_CPU_ARCH_X86 && vendor == NCCL_TOPO_CPU_VENDOR_INTEL) {
+-    p2pLevel = PATH_PXB;
++    p2pLevel = PATH_SYS;
+   }
+   if (arch == NCCL_TOPO_CPU_ARCH_X86 && vendor == NCCL_TOPO_CPU_VENDOR_ZHAOXIN) {
+     p2pLevel = PATH_PXB;

@@ -1,0 +1,44 @@
+diff --git a/src/enqueue.cc b/src/enqueue.cc
+index c46401cf..e14e1d25 100644
+--- a/src/enqueue.cc
++++ b/src/enqueue.cc
+@@ -191,7 +191,7 @@ static void finishPlan(struct ncclComm* comm, struct ncclKernelPlan* plan) {
+   size_t workBytes = plan->workBytes;
+   size_t batchBytes = plan->nWorkBatches*sizeof(struct ncclDevWorkBatch);
+ 
+-  plan->threadPerBlock = std::max(plan->threadPerBlock, NCCL_MIN_NTHREADS);
++  plan->threadPerBlock = std::max(plan->threadPerBlock, 256);
+ 
+   // If we can fit everything into the kernel args we do so.
+   if (sizeof(ncclDevKernelArgs) + batchBytes + workBytes <= comm->workArgsBytes) {
+@@ -822,7 +822,7 @@ static ncclResult_t scheduleCollTasksToPlan(
+       plan->channelMask.masks[maskIdx] |= (1ull<<relativeIdx);
+     }
+     //plan->channelMask.masks[channelId/64] |= (2ull<<devWork->channelHi) - (1ull<<devWork->channelLo);
+-    plan->threadPerBlock = std::max(plan->threadPerBlock, 3*plan->comm->WarpSize);
++    plan->threadPerBlock = std::max(plan->threadPerBlock, 192);
+     if (!plan->kernelSpecialized) {
+       plan->kernelFn = ncclKerns[ncclGetKernelIndex(comm)].kernelFn;
+       plan->kernelSpecialized = ncclKerns[ncclGetKernelIndex(comm)].specialized;
+@@ -1750,9 +1750,9 @@ static ncclResult_t topoGetAlgoInfo(
+     }
+   }
+   if (info->protocol == NCCL_PROTO_SIMPLE) {
+-    if (info->algorithm == NCCL_ALGO_RING) nt += WARP_SIZE; // Extra warp for sync
++    if (info->algorithm == NCCL_ALGO_RING) nt += comm->WarpSize; // Extra warp for sync
+     // More threads or sync warps needed due to split thread model
+-    if (info->algorithm == NCCL_ALGO_TREE) nt += 4*WARP_SIZE;
++    if (info->algorithm == NCCL_ALGO_TREE) nt += 4*comm->WarpSize;
+   }
+   nt = nt/WARP_SIZE < 3 ? 3*WARP_SIZE : nt;
+ #endif
+@@ -1785,7 +1785,7 @@ static ncclResult_t topoGetAlgoInfo(
+     info->nMaxChannels = nc;
+   }
+   if (info->algorithm == NCCL_ALGO_TREE) nt = NCCL_MAX_NTHREADS; // Tree now uses all threads always.
+-  info->nWarps = nt/WARP_SIZE;
++  info->nWarps = nt/comm->WarpSize;
+   return ncclSuccess;
+ }
+ 
+

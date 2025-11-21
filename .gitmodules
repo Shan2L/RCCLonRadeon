@@ -1,0 +1,7 @@
+[submodule "3rd_party/rccl"]
+	path = 3rd_party/rccl
+	url = https://github.com/ROCm/rccl.git
+
+[submodule "3rd_party/rccl-tests"]
+	path = 3rd_party/rccl-tests
+	url = https://github.com/ROCm/rccl-tests.git
