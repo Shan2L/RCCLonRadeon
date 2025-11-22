@@ -38,9 +38,10 @@ def print_args(args):
     print("==================================================== ")
     
 
-def run_bash_command(command: list[str], timeout: int=600, cwd=None, env: Dict = None) -> Dict:
+def run_bash_command(command: list[str], timeout: int=600, cwd=None, env: Dict = None, shell:bool = False) -> Dict:
+    
     logger.log(f"Running command: {' '.join(command)}, with env: {env}")
-    ret = subprocess.run(command, capture_output=True, text=True, shell=False, timeout=timeout, cwd=cwd if cwd else None, env=env if env!=None else None)
+    ret = subprocess.run(command, capture_output=True, text=True, shell=shell, timeout=timeout, cwd=cwd if cwd else None, env=env if env!=None else None)
     if ret.returncode != 0:
         logger.log(ret.stderr, level="error")
         raise KeyError("Bash command return error")
@@ -113,6 +114,7 @@ def main(args):
         run_bash_command(rccl_build_command, cwd=rccl_path, timeout=6000)
         logger.log("RCCL build successfully.")
 
+
         # cp .so to archive dir
         run_bash_command(["cp", os.path.join(args.prefix, 'lib/librccl.so.1.0'), archive_dir])
         logger.log(f"librccl.so has been copied to {archive_dir}.")
@@ -132,11 +134,12 @@ def main(args):
                 install_mpi()
 
         build_tests_command.extend(["-j", "32"])
-        envs = os.environ.copy()
+
+        envs = os.environ
         ld_library_path  = envs.get("LD_LIBRARY_PATH", "")
         envs['GPU_TARGETS'] = args.amdgpu_targets
         envs["LD_LIBRARY_PATH"] = f"{args.prefix}/lib:" + ld_library_path
-        run_bash_command(build_tests_command, cwd=rccltests_path, timeout=600, env=envs)
+        run_bash_command(build_tests_command, cwd=rccltests_path, timeout=600, env=envs.copy())
         logger.log("Rccl-tests built successfully.")
 
 if __name__ == "__main__":
