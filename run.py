@@ -55,16 +55,22 @@ def init_submodules():
 
 
 def install_mpi():
-    if not os.path.exists("/usr/local/mpi"):
-        if not os.path.exists(os.path.join(cwd, "mpich-4.3.1.tar.gz")):
-            run_bash_command(["wget", "https://www.mpich.org/static/downloads/4.3.1/mpich-4.3.1.tar.gz"])
-        if not os.path.exists(os.path.join(cwd, "mpich-4.3.1")):
-            run_bash_command(["tar", "-xzvf", "mpich-4.3.1.tar.gz"])
-        run_bash_command(["./configure", "--prefix=/usr/local/mpi"], cwd=os.path.join(cwd, "mpich-4.3.1"))
-        run_bash_command(["make", "-j", "128"], cwd=os.path.join(cwd, "mpich-4.3.1"))
-        run_bash_command(["make", "install"], cwd=os.path.join(cwd, "mpich-4.3.1"))
-        logger.log("MPI has been installed to /usr/local/mpi successfully.")
+    if not os.path.exists(os.path.join(cwd, "mpich-4.3.1.tar.gz")):
+        run_bash_command(["wget", "https://www.mpich.org/static/downloads/4.3.1/mpich-4.3.1.tar.gz"])
+    if not os.path.exists(os.path.join(cwd, "mpich-4.3.1")):
+        run_bash_command(["tar", "-xzvf", "mpich-4.3.1.tar.gz"])
+    run_bash_command(["./configure", "--prefix=/usr/local/mpi"], cwd=os.path.join(cwd, "mpich-4.3.1"))
+    run_bash_command(["make", "-j", "128"], cwd=os.path.join(cwd, "mpich-4.3.1"))
+    run_bash_command(["make", "install"], cwd=os.path.join(cwd, "mpich-4.3.1"))
+    logger.log("MPI has been installed to /usr/local/mpi successfully.")
 
+    run_bash_command(["echo", "'export PATH=/usr/local/mpi/bin:$PATH'", ">>", "~/.bashrc"])
+    run_bash_command(["echo", "'export LD_LIBRARY_PATH=/usr/local/mpi/lib:$LD_LIBRARY_PATH'", ">>", "~/.bashrc"])
+    envs = os.environ.copy()
+    logger.log("MPI environment variables have been added to ~/.bashrc.")
+    logger.log(f"LD_LIBRARY_PATH: {envs['LD_LIBRARY_PATH']}")
+    logger.log(f"PATH: {envs['PATH']}")
+    
 
 def get_patch_list(patch_list_str: str) -> list[str]:
     return [f"{patch_id}.patch" for patch_id in patch_list_str.split(",")] if patch_list_str else []
@@ -75,6 +81,11 @@ def main(args):
 
     # build rccl
     if args.build_rccl:
+        if os.path.exists(os.path.join(rccl_path, "build")):
+            shutil.rmtree(os.path.join(rccl_path, "build"))
+            logger.log(f"Removed existing rccl build directory: {os.path.join(rccl_path, 'build')}")
+
+
         run_bash_command(["git", "checkout", "."], cwd=os.path.join(cwd, rccl_path))
         patch_list = get_patch_list(args.patch_list)
         if len(patch_list) > 0:
@@ -108,18 +119,23 @@ def main(args):
 
     # build rccl-tests
     if args.build_rccl_tests:
+        if os.path.exists(os.path.join(rccltests_path, "build")):
+            shutil.rmtree(os.path.join(rccltests_path, "build"))
+            logger.log(f"Removed existing rccl-tests build directory: {os.path.join(rccltests_path, 'build')}")
+
         build_tests_command = ["make"]
         if args.build_tests_with_MPI:
             build_tests_command.append("USE_MPI=1")
             build_tests_command.append("MPI_HOME=/usr/local/mpi")
             build_tests_command.append(f"RCCL_HOME={args.prefix}")
-            install_mpi()
+            if not os.path.exists("/usr/local/mpi"):
+                install_mpi()
 
         build_tests_command.extend(["-j", "32"])
         envs = os.environ.copy()
-        ld_path_list=envs['LD_LIBRARY_PATH']
-        envs['LD_LIBRARY_PATH'] = f"{args.prefix}:{ld_path_list}"
+        ld_library_path  = envs.get("LD_LIBRARY_PATH", "")
         envs['GPU_TARGETS'] = args.amdgpu_targets
+        envs["LD_LIBRARY_PATH"] = f"{args.prefix}/lib:" + ld_library_path
         run_bash_command(build_tests_command, cwd=rccltests_path, timeout=600, env=envs)
         logger.log("Rccl-tests built successfully.")
 
