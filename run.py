@@ -38,9 +38,9 @@ def print_args(args):
     print("==================================================== ")
     
 
-def run_bash_command(command: list[str], timeout: int=600, cwd=None) -> Dict:
-    logger.log(f"Running command: {' '.join(command)}")
-    ret = subprocess.run(command, capture_output=True, text=True, shell=False, timeout=timeout, cwd=cwd if cwd else None)
+def run_bash_command(command: list[str], timeout: int=600, cwd=None, env: Dict = None) -> Dict:
+    logger.log(f"Running command: {' '.join(command)}, , with env: {env}")
+    ret = subprocess.run(command, capture_output=True, text=True, shell=False, timeout=timeout, cwd=cwd if cwd else None, env=env if env!=None else None)
     if ret.returncode != 0:
         logger.log(ret.stderr, level="error")
         raise KeyError("Bash command return error")
@@ -74,42 +74,44 @@ def main(args):
 
     init_submodules()
 
-    run_bash_command(["git", "checkout", "."], cwd=os.path.join(cwd, rccl_path))
-    patch_list = get_patch_list(args.patch_list)
-    if len(patch_list) > 0:
-        print("Checking patch files...")
-        for patch in patch_list:
-            patch_file = os.path.join(patch_dir, patch)
-            if os.path.exists(patch_file):
-                logger.log(f"Found patch file: {patch_file}")
-                run_bash_command(["git", "apply", patch_file], cwd=os.path.join(cwd, rccl_path))
-                logger.log(f"Applied patch file: {patch_file}")
-                
-            else:
-                logger.log(f"Patch file not found: {patch_file}", level="error")
+
     
     # build rccl
-    if os.path.exists(args.prefix):
-        shutil.rmtree(args.prefix, )
-        logger.log(f"Removed existing installation directory: {args.prefix}")
-    rccl_build_command = ["./install.sh", f"--prefix={args.prefix}", "--install", "-j 128"]
-    if args.debug:
-        rccl_build_command.append("--debug")
-    if args.amdgpu_targets:
-        rccl_build_command.append(f"--amdgpu_targets='{args.amdgpu_targets}'")
-        
-    run_bash_command(rccl_build_command, cwd=rccl_path, timeout=6000)
-    logger.log("RCCL build successfully.")
+    if args.build_rccl:
+        run_bash_command(["git", "checkout", "."], cwd=os.path.join(cwd, rccl_path))
+        patch_list = get_patch_list(args.patch_list)
+        if len(patch_list) > 0:
+            print("Checking patch files...")
+            for patch in patch_list:
+                patch_file = os.path.join(patch_dir, patch)
+                if os.path.exists(patch_file):
+                    logger.log(f"Found patch file: {patch_file}")
+                    run_bash_command(["git", "apply", patch_file], cwd=os.path.join(cwd, rccl_path))
+                    logger.log(f"Applied patch file: {patch_file}")
+                    
+                else:
+                    logger.log(f"Patch file not found: {patch_file}", level="error")
 
-    # cp .so to archive dir
-    run_bash_command(["cp", os.path.join(args.prefix, 'lib/librccl.so.1.0'), archive_dir])
-    logger.log(f"librccl.so has been copied to {archive_dir}.")
+        logger.log("Start building RCCL")
+        if os.path.exists(args.prefix):
+            shutil.rmtree(args.prefix, )
+            logger.log(f"Removed existing installation directory: {args.prefix}")
+        rccl_build_command = ["./install.sh", f"--prefix={args.prefix}", "--install", "-j 128"]
+        if args.debug:
+            rccl_build_command.append("--debug")
+        if args.amdgpu_targets:
+            rccl_build_command.append(f"--amdgpu_targets='{args.amdgpu_targets}'")
+            
+        run_bash_command(rccl_build_command, cwd=rccl_path, timeout=6000)
+        logger.log("RCCL build successfully.")
+
+        # cp .so to archive dir
+        run_bash_command(["cp", os.path.join(args.prefix, 'lib/librccl.so.1.0'), archive_dir])
+        logger.log(f"librccl.so has been copied to {archive_dir}.")
 
     # build rccl-tests
     if args.build_rccl_tests:
-        build_tests_command = [f"GPU_TARGETS={args.amdgpu_targets}", 
-                               f"LD_LIBRARY_PATH={args.prefix}/lib:$LIBRARY_PATH",
-                                "make"]
+        build_tests_command = ["make"]
         if args.build_tests_with_MPI:
             build_tests_command.append("USE_MPI=1")
             build_tests_command.append("MPI_HOME=/usr/local/mpi")
@@ -117,8 +119,12 @@ def main(args):
             install_mpi()
 
         build_tests_command.extend(["-j", "32"])
-        run_bash_command(build_tests_command, cwd=rccltests_path, timeout=600)
-        logger.log("Rcccl-tests built successfully.")
+        envs = os.environ.copy()
+        ld_path_list=envs['LD_LIBRARY_PATH']
+        envs['LD_LIBRARY_PATH'] = f"{args.prefix}:{ld_path_list}"
+        envs['GPU_TARGETS'] = args.amdgpu_targets
+        run_bash_command(build_tests_command, cwd=rccltests_path, timeout=600, env=envs)
+        logger.log("Rccl-tests built successfully.")
 
 if __name__ == "__main__":
 
@@ -133,6 +139,7 @@ if __name__ == "__main__":
                       help="Installation prefix", default=f"{cwd}/install")
     args.add_argument("--debug", action="store_true", 
                       help="Build RCCL with debug symbols")
+    args.add_argument("--build_rccl", action="store_true", help="Build RCCL library")
     args.add_argument("--build_rccl_tests", action="store_true", help="Build RCCL tests")
     args.add_argument("--build_tests_with_MPI", action="store_true", help="Build RCCL tests with MPI support")
     args.add_argument("--log_dir", type=str, help="Path to store build logs", default=os.getcwd()+"/logs")
