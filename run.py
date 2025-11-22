@@ -39,7 +39,7 @@ def print_args(args):
     
 
 def run_bash_command(command: list[str], timeout: int=600, cwd=None, env: Dict = None) -> Dict:
-    logger.log(f"Running command: {' '.join(command)}, , with env: {env}")
+    logger.log(f"Running command: {' '.join(command)}, with env: {env}")
     ret = subprocess.run(command, capture_output=True, text=True, shell=False, timeout=timeout, cwd=cwd if cwd else None, env=env if env!=None else None)
     if ret.returncode != 0:
         logger.log(ret.stderr, level="error")
@@ -71,11 +71,8 @@ def get_patch_list(patch_list_str: str) -> list[str]:
 
 
 def main(args):
-
     init_submodules()
 
-
-    
     # build rccl
     if args.build_rccl:
         run_bash_command(["git", "checkout", "."], cwd=os.path.join(cwd, rccl_path))
