@@ -46,6 +46,7 @@ def run_bash_command(command: list[str], timeout: int=600, cwd=None, env: Dict =
         logger.log(ret.stderr, level="error")
         raise KeyError("Bash command return error")
     else:
+        logger.log(ret.stdout)
         return ret
 
 
@@ -127,7 +128,7 @@ def main(args):
 
         build_tests_command = ["make"]
         if args.build_tests_with_MPI:
-            build_tests_command.append("USE_MPI=1")
+            build_tests_command.append("MPI=1")
             build_tests_command.append("MPI_HOME=/usr/local/mpi")
             build_tests_command.append(f"RCCL_HOME={args.prefix}")
             if not os.path.exists("/usr/local/mpi"):
