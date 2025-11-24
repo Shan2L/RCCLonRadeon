@@ -65,13 +65,6 @@ def install_mpi():
     run_bash_command(["make", "-j", "128"], cwd=os.path.join(cwd, "mpich-4.3.1"))
     run_bash_command(["make", "install"], cwd=os.path.join(cwd, "mpich-4.3.1"))
     logger.log("MPI has been installed to /usr/local/mpi successfully.")
-
-    run_bash_command(["echo", "'export PATH=/usr/local/mpi/bin:$PATH'", ">>", "~/.bashrc"])
-    run_bash_command(["echo", "'export LD_LIBRARY_PATH=/usr/local/mpi/lib:$LD_LIBRARY_PATH'", ">>", "~/.bashrc"])
-    envs = os.environ.copy()
-    logger.log("MPI environment variables have been added to ~/.bashrc.")
-    logger.log(f"LD_LIBRARY_PATH: {envs['LD_LIBRARY_PATH']}")
-    logger.log(f"PATH: {envs['PATH']}")
     
 
 def get_patch_list(patch_list_str: str) -> list[str]:
