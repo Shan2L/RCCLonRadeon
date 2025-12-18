@@ -72,7 +72,9 @@ def get_patch_list(patch_list_str: str) -> list[str]:
 
 
 def main(args):
-    init_submodules()
+
+    if args.build_rccl or args.build_rccl_tests:
+        init_submodules()
 
     # build rccl
     if args.build_rccl:
@@ -136,6 +138,9 @@ def main(args):
         run_bash_command(build_tests_command, cwd=rccltests_path, timeout=600, env=envs.copy())
         logger.log("Rccl-tests built successfully.")
 
+    if args.build_mpi_only:
+        install_mpi()
+
 if __name__ == "__main__":
 
     now = datetime.now()
@@ -151,6 +156,7 @@ if __name__ == "__main__":
                       help="Build RCCL with debug symbols")
     args.add_argument("--build_rccl", action="store_true", help="Build RCCL library")
     args.add_argument("--build_rccl_tests", action="store_true", help="Build RCCL tests")
+    args.add_argument("--build_mpi_only", action="store_true", help="Only build and install MPI")
     args.add_argument("--build_tests_with_MPI", action="store_true", help="Build RCCL tests with MPI support")
     args.add_argument("--log_dir", type=str, help="Path to store build logs", default=os.getcwd()+"/logs")
     args.add_argument("--archive_dir", type=str, help="Path to store build archives", default=os.getcwd()+"/archives")
